@@ -1,0 +1,16 @@
+{
+  "name": "Pinheiro Tech | Gestão Pro",
+  "short_name": "PinheiroTech",
+  "description": "Sistema de Gestão para Assistência Técnica Pinheiro Tech",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2940/2940037.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
