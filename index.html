@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <link rel="manifest" href="manifest.json">
+    <script>if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js');}</script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pinheiro Tech | Gestão Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --bg: #09090b; --card: #111113; --fg: #ffffff; --muted: #a1a1aa; --border: #27272a; --primary: #3b82f6; --success: #22c55e; --error: #ef4444; --warning: #f59e0b; --radius: 10px; }
+        
+        /* Estilos do Modo Claro (Configurações) */
+        .light-mode { --bg: #f4f4f5; --card: #ffffff; --fg: #09090b; --muted: #71717a; --border: #e4e4e7; }
+
+        * { box-sizing: border-box; font-family: 'Inter', sans-serif; margin: 0; padding: 0; transition: background 0.3s, border-color 0.3s; }
+        body { background: var(--bg); color: var(--fg); padding-bottom: 60px; overflow-x: hidden; }
+        
+        /* ANIMAÇÕES ADICIONADAS */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes slideRight { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        .page { display: none; animation: fadeIn 0.4s ease-out; } 
+        .page.active { display: block; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem; position: relative; transition: transform 0.2s; }
+        .card:active { transform: scale(0.99); }
+        
+        /* CORES DINÂMICAS POR STATUS */
+        .status-bancada { border-left: 5px solid var(--primary) !important; }
+        .status-peca { border-left: 5px solid var(--warning) !important; }
+        .status-pronto { border-left: 5px solid var(--success) !important; }
+        .status-entregue { border-left: 5px solid #10b981 !important; }
+        .status-cancelado { border-left: 5px solid var(--error) !important; }
+        
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 800; text-transform: uppercase; color: white; display: inline-block; margin-top: 5px; }
+        .bg-bancada { background: var(--primary); }
+        .bg-peca { background: var(--warning); }
+        .bg-pronto { background: var(--success); }
+        .bg-entregue { background: #10b981; }
+        .bg-cancelado { background: var(--error); }
+
+        /* TELA DE LOGIN */
+        #login-screen { position: fixed; inset: 0; background: var(--bg); z-index: 5000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .login-card { background: var(--card); border: 1px solid var(--border); padding: 2.5rem; border-radius: var(--radius); width: 100%; max-width: 400px; text-align: center; animation: scaleIn 0.5s ease; }
+
+        .header { height: 64px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 1.5rem; position: sticky; top: 0; background: rgba(9,9,11,0.9); backdrop-filter: blur(10px); z-index: 100; }
+        .logo { font-weight: 800; font-size: 1.2rem; color: var(--primary); }
+        .btn-menu { background: var(--primary); border: none; color: #fff; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: filter 0.2s; font-size: 1.2rem; }
+        .btn-menu:hover { filter: brightness(1.2); }
+        .header-actions { display: flex; align-items: center; gap: 10px; position: relative; }
+        .btn-notif { background: #18181b; border: 1px solid var(--border); color: #fff; width: 40px; height: 40px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; }
+        .badge-notif { position: absolute; top: -5px; right: -5px; background: var(--error); color: white; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 10px; display: none; }
+        .notif-center { position: absolute; top: 50px; right: 0; background: #18181b; border: 1px solid var(--border); border-radius: var(--radius); width: 280px; display: none; z-index: 1001; box-shadow: 0 10px 15px rgba(0,0,0,0.5); max-height: 400px; overflow-y: auto; animation: scaleIn 0.2s ease; }
+        .notif-center.active { display: block; }
+        .notif-item { padding: 12px 15px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 1.4; animation: slideRight 0.3s ease; }
+        .notif-item:last-child { border-bottom: none; }
+        .notif-title { font-weight: 700; display: block; margin-bottom: 2px; }
+        .notif-warn { border-left: 3px solid var(--warning); }
+        .notif-err { border-left: 3px solid var(--error); }
+        
+        .nav-menu { position: absolute; top: 70px; right: 1.5rem; background: #18181b; border: 1px solid var(--border); border-radius: var(--radius); width: 220px; display: none; z-index: 1000; box-shadow: 0 10px 15px rgba(0,0,0,0.5); animation: scaleIn 0.2s ease; max-height: 80vh; overflow-y: auto; }
+        .nav-menu button { width: 100%; padding: 14px 16px; background: none; border: none; color: #fff; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
+        .nav-menu.active { display: block; }
+        .container { max-width: 650px; margin: 0 auto; padding: 1.5rem; }
+        
+        label { font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 6px; display: block; text-transform: uppercase; }
+        input, select, textarea { width: 100%; background: #000; border: 1px solid var(--border); border-radius: 8px; padding: 12px; color: #fff; font-size: 14px; margin-bottom: 15px; transition: border-color 0.3s; }
+        input:focus { border-color: var(--primary); outline: none; }
+        .chk-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1f1f22; }
+        .opt-group { display: flex; gap: 4px; }
+        .opt-btn { font-size: 9px; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border); background: #18181b; color: var(--muted); cursor: pointer; font-weight: 700; transition: all 0.2s; }
+        .opt-btn.active-ok { background: var(--success); color: #000; border: none; transform: scale(1.05); }
+        .opt-btn.active-bad { background: var(--error); color: #fff; border: none; transform: scale(1.05); }
+        .opt-btn.active-na { background: var(--muted); color: #000; border: none; }
+        .btn-main { background: var(--primary); color: #fff; border: none; padding: 16px; border-radius: 8px; font-weight: 700; width: 100%; cursor: pointer; margin-top: 10px; transition: 0.2s; }
+        .btn-main:active { transform: scale(0.97); filter: brightness(0.9); }
+        .btn-sec { background: #18181b; border: 1px solid var(--border); color: #fff; padding: 12px; border-radius: 8px; width: 100%; cursor: pointer; font-size: 13px; margin-bottom: 10px; }
+        .btn-del { background: rgba(239, 68, 68, 0.1); color: var(--error); border: 1px solid var(--error); padding: 5px 10px; border-radius: 4px; font-size: 10px; cursor: pointer; float: right; }
+        
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 2000; display: none; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px); }
+        .modal-body { background: var(--bg); border: 1px solid var(--border); padding: 1.5rem; border-radius: var(--radius); width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; animation: scaleIn 0.3s ease; }
+        .dash-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px; }
+        .mini-card { background: #18181b; padding: 12px; border-radius: 8px; border: 1px solid var(--border); animation: fadeIn 0.5s ease forwards; }
+        #notif-container { position: fixed; bottom: 20px; right: 20px; z-index: 3000; display: flex; flex-direction: column; gap: 10px; }
+        .notif { background: #18181b; border-left: 4px solid var(--primary); color: #fff; padding: 12px 20px; border-radius: 4px; font-size: 13px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 15px; }
+        .photo-box { background: #000; aspect-ratio: 1; border-radius: 6px; border: 1px dashed var(--border); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; transition: 0.3s; }
+        .photo-box img { width: 100%; height: 100%; object-fit: cover; animation: fadeIn 0.5s; }
+        
+        .cat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px; }
+        .cat-btn { background: #18181b; border: 1px solid var(--border); color: #fff; padding: 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; text-align: center; }
+        .cat-btn:hover { border-color: var(--primary); background: #27272a; }
+        .solucao-card { background: #000; border: 1px solid var(--border); padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid var(--primary); }
+        .panic-box { background: #000; border: 1px solid var(--border); padding: 15px; border-radius: 8px; font-family: monospace; font-size: 12px; color: #22c55e; min-height: 100px; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #print-content, #print-content * { visibility: visible; }
+            #print-content { position: absolute; left: 0; top: 0; width: 100%; color: black !important; background: white !important; }
+            .modal { background: white !important; border:none !important; }
+            .btn-main, .btn-sec, .btn-del { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <div class="login-card">
+            <div class="logo" style="font-size: 2rem; margin-bottom: 20px;">PINHEIRO<span>TECH</span></div>
+            <label>Usuário</label>
+            <input type="text" id="login-user" placeholder="Digite seu usuário">
+            <label>Senha</label>
+            <input type="password" id="login-pass" placeholder="Digite sua senha">
+            <button class="btn-main" onclick="efetuarLogin()">ENTRAR NO SISTEMA</button>
+        </div>
+    </div>
+
+    <div id="notif-container"></div>
+
+    <header class="header">
+        <div class="logo">PINHEIRO<span>TECH</span></div>
+        <div class="header-actions">
+            <button class="btn-notif" onclick="toggleNotifCenter()">
+                🔔 <span id="notif-badge" class="badge-notif">0</span>
+            </button>
+            <div id="notifCenter" class="notif-center">
+                <div style="padding: 15px; border-bottom: 1px solid var(--border); font-weight: 800; font-size: 14px;">CENTRAL DE AVISOS</div>
+                <div id="notif-list"></div>
+            </div>
+            <button class="btn-menu" onclick="toggleMenu()">⋮</button>
+        </div>
+        
+        <div class="nav-menu" id="mainMenu">
+            <button onclick="nav('dash')">📊 Dashboard</button>
+            <button onclick="nav('entrada')">🛠️ Nova Entrada</button>
+            <button onclick="nav('lista')">📋 Ordens</button>
+            <button onclick="nav('tecnicos')">👨‍🔧 Técnicos</button>
+            <button onclick="nav('clientes')">👤 Clientes</button>
+            <button onclick="nav('solucoes')">💡 Soluções & Panic</button>
+            <button onclick="nav('fornecedores')">🚚 Fornecedores</button>
+            <button onclick="nav('freteiros')">📦 Freteiros</button>
+            <button onclick="nav('estoque')">📦 Estoque</button>
+            <button onclick="nav('relatorios')">📈 Relatórios</button>
+            <button onclick="nav('config')" style="color:var(--warning)">⚙️ Configurações</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div id="pg-solucoes" class="page">
+            <h2>Guia de Reparos & Diagnóstico</h2>
+            <div class="card">
+                <label>Selecione o Sistema Operacional:</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+                    <button class="btn-sec" id="btn-filtro-iphone" onclick="setSytemFilter('iphone')" style="background: #333; border-color: #555;"> iPhone (iOS)</button>
+                    <button class="btn-sec" id="btn-filtro-android" onclick="setSytemFilter('android')" style="background: #3d5afe; border-color: #3d5afe;">🤖 Android</button>
+                </div>
+                <label>🔍 Filtrar por termo técnico ou defeito:</label>
+                <input type="text" id="busca-defeito" placeholder="Ex: Curto, NAND, Wifi, 4013..." onkeyup="filtrarDefeitos()">
+                <label>Categorias de Falhas:</label>
+                <div class="cat-grid">
+                    <button class="cat-btn" onclick="mostrarFalhas('energia')">⚡ Energia / Boot</button>
+                    <button class="cat-btn" onclick="mostrarFalhas('tela')">📱 Tela / Touch</button>
+                    <button class="cat-btn" onclick="mostrarFalhas('audio')">🔊 Áudio / Mic</button>
+                    <button class="cat-btn" onclick="mostrarFalhas('rede')">📶 Sinal / WiFi</button>
+                    <button class="cat-btn" onclick="mostrarFalhas('camera')">📸 Câmeras</button>
+                    <button class="cat-btn" onclick="mostrarFalhas('sensores')">🛡️ FaceID / Biometria</button>
+                </div>
+                <div id="result-solucao" style="margin-top: 10px;"></div>
+                <hr style="border:0; border-top:1px solid var(--border); margin: 20px 0;">
+                <label style="color:var(--error)">Analisador Panic Full (Logs)</label>
+                <textarea id="panic-log" rows="5" placeholder="Cole o log do Panic Full aqui para analisar..."></textarea>
+                <button class="btn-main" style="background:var(--error)" onclick="analisarPanic()">ANALISAR CÓDIGO DE ERRO</button>
+                <div id="panic-result" class="panic-box" style="margin-top: 15px; display:none"></div>
+            </div>
+        </div>
+
+        <div id="pg-config" class="page">
+            <h2>Configurações do App</h2>
+            <div class="card">
+                <label>Aparência do Sistema</label>
+                <button class="btn-sec" id="toggle-dark" onclick="toggleDarkMode()">🌙 ALTERAR PARA MODO CLARO</button>
+                <label style="margin-top: 20px;">Idioma</label>
+                <select id="config-lang" onchange="notify('Idioma alterado com sucesso!')">
+                    <option value="pt">Português (Brasil)</option>
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                </select>
+                <label style="margin-top: 20px;">Segurança</label>
+                <button class="btn-sec" onclick="location.reload()" style="color:var(--error); border-color: var(--error)">🔓 SAIR / FAZER LOGOUT</button>
+            </div>
+        </div>
+
+        <div id="pg-dash" class="page active">
+            <h2>Dashboard Operacional</h2>
+            <div class="dash-grid">
+                <div class="mini-card" style="animation-delay: 0.1s; border-left: 4px solid var(--success)"><label>Faturamento</label><h3 id="d-caixa" style="color:var(--success)">R$ 0</h3></div>
+                <div class="mini-card" style="animation-delay: 0.2s; border-left: 4px solid var(--primary)"><label>Em Aberto</label><h3 id="d-ativos">0</h3></div>
+                <div class="mini-card" style="animation-delay: 0.3s; border-left: 4px solid var(--warning)"><label>Aguard. Peça</label><h3 id="d-peca">0</h3></div>
+                <div class="mini-card" style="animation-delay: 0.4s; border-left: 4px solid var(--success)"><label>Finalizados</label><h3 id="d-pronto">0</h3></div>
+            </div>
+            <div class="card"><canvas id="meuGrafico" height="200"></canvas></div>
+        </div>
+
+        <div id="pg-tecnicos" class="page">
+            <h2>Cadastro de Técnicos</h2>
+            <div class="card">
+                <input id="t-nome" placeholder="Nome do Técnico">
+                <button class="btn-main" onclick="salvarTecnico()">CADASTRAR TÉCNICO</button>
+            </div>
+            <div id="lista-tecnicos"></div>
+        </div>
+
+        <div id="pg-relatorios" class="page">
+            <h2>Relatórios Detalhados</h2>
+            <div class="card">
+                <label>Filtrar por Período</label>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
+                    <input type="date" id="rel-inicio">
+                    <input type="date" id="rel-fim">
+                </div>
+                <label>Status</label>
+                <select id="rel-status">
+                    <option value="Todos">Todos os Status</option>
+                    <option value="Bancada">👨‍🔧 Na Bancada</option>
+                    <option value="Aguardando Peça">📦 Aguardando Peça</option>
+                    <option value="Pronto">✅ Pronto / Testado</option>
+                    <option value="Entregue">💰 Entregue e Pago</option>
+                    <option value="Cancelado">❌ Cancelado</option>
+                </select>
+                <button class="btn-main" onclick="gerarRelatorio()">FILTRAR RELATÓRIO</button>
+                <button class="btn-sec" onclick="imprimirRelatorio()" style="margin-top:10px; background:#6366f1">🖨️ IMPRIMIR RELATÓRIO PDF</button>
+            </div>
+            <div id="resumo-financeiro" style="display:none">
+                <div class="dash-grid">
+                    <div class="mini-card"><label>Total Bruto</label><h4 id="r-bruto">R$ 0</h4></div>
+                    <div class="mini-card"><label>Custo Peças</label><h4 id="r-pecas" style="color:var(--error)">R$ 0</h4></div>
+                    <div class="mini-card"><label>Total Frete</label><h4 id="r-frete" style="color:var(--error)">R$ 0</h4></div>
+                    <div class="mini-card"><label>Lucro Líquido</label><h4 id="r-lucro" style="color:var(--success)">R$ 0</h4></div>
+                </div>
+                <div class="card" id="rel-tabela" style="font-size:12px; overflow-x:auto"></div>
+            </div>
+        </div>
+
+        <div id="pg-clientes" class="page">
+            <h2>Cadastro de Cliente</h2>
+            <div class="card">
+                <label>Dados Pessoais</label>
+                <input id="c-nome" placeholder="Nome Completo">
+                <input id="c-zap" type="number" placeholder="WhatsApp Principal">
+                <input id="c-zap2" type="number" placeholder="WhatsApp Recado">
+                <input id="c-doc" placeholder="CPF/CNPJ">
+                <input id="c-email" placeholder="E-mail">
+                <label>Endereço</label>
+                <input id="c-end" placeholder="Rua, Número, Bairro">
+                <input id="c-cidade" placeholder="Cidade - MT">
+                <button class="btn-main" onclick="salvarCliente()">SALVAR CLIENTE COMPLETO</button>
+            </div>
+            <div id="lista-clientes"></div>
+        </div>
+
+        <div id="pg-entrada" class="page">
+            <h2>Entrada de Dispositivo</h2>
+            <div class="card">
+                <label>Cliente</label><select id="sel-cliente"></select>
+                <input id="os-apa" placeholder="Modelo do Aparelho (Ex: iPhone 11)">
+                <input id="os-senha" placeholder="Senha de Bloqueio">
+                <label>Fotos do Aparelho (Máx 6)</label>
+                <div class="photo-grid" id="photo-preview-container">
+                    <div class="photo-box">1</div><div class="photo-box">2</div><div class="photo-box">3</div>
+                    <div class="photo-box">4</div><div class="photo-box">5</div><div class="photo-box">6</div>
+                </div>
+                <button class="btn-sec" onclick="document.getElementById('os-cam').click()" style="background:var(--primary)" id="btn-foto-count">📷 TIRAR FOTO (0/6)</button>
+                <input type="file" id="os-cam" accept="image/*" capture="environment" style="display:none" onchange="addFoto(this)">
+                <label style="color:var(--primary)">Checklist Interno</label>
+                <div id="chk-func"></div>
+                <label style="color:var(--warning); margin-top:15px">Checklist Externo</label>
+                <div id="chk-ext"></div>
+                <label>Defeito Reclamado</label>
+                <textarea id="os-serv" rows="3"></textarea>
+                <button class="btn-main" onclick="gerarOS()">GERAR ORDEM DE SERVIÇO</button>
+            </div>
+        </div>
+
+        <div id="pg-fornecedores" class="page">
+            <h2>Fornecedores</h2>
+            <div class="card">
+                <input id="f-nome" placeholder="Nome/Razão Social">
+                <input id="f-tel" placeholder="Telefone de Contato">
+                <input id="f-end" placeholder="Endereço Completo">
+                <button class="btn-main" onclick="salvarFornecedor()">CADASTRAR FORNECEDOR</button>
+            </div>
+            <div id="lista-fornecedores"></div>
+        </div>
+
+        <div id="pg-freteiros" class="page">
+            <h2>Gestão de Freteiros</h2>
+            <div class="card">
+                <input id="fr-nome" placeholder="Nome do Freteiro">
+                <input id="fr-tel" placeholder="WhatsApp">
+                <button class="btn-main" onclick="salvarFreteiro()">CADASTRAR FRETEIRO</button>
+            </div>
+            <div id="lista-freteiros"></div>
+        </div>
+
+        <div id="pg-estoque" class="page">
+            <h2>Estoque de Peças</h2>
+            <div class="card">
+                <input id="e-nome" placeholder="Nome da Peça">
+                <label>Fornecedor</label><select id="sel-forn-est"></select>
+                <label>Status / Freteiro</label>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
+                    <select id="e-status">
+                        <option value="Em Estoque">✅ Em Estoque</option>
+                        <option value="Pendente">⏳ Pedido Pendente</option>
+                        <option value="Com Freteiro">🚚 Com Freteiro</option>
+                    </select>
+                    <select id="sel-freteiro-est"></select>
+                </div>
+                <input id="e-qtd" type="number" placeholder="Quantidade">
+                <input type="hidden" id="e-id-atual">
+                <button class="btn-main" id="btn-salvar-estoque" onclick="salvarEstoque()">SALVAR NO ESTOQUE</button>
+            </div>
+            <div id="lista-estoque"></div>
+        </div>
+
+        <div id="pg-lista" class="page">
+            <h2>Ordens de Serviço</h2>
+            <input id="busca" onkeyup="renderOS()" placeholder="🔍 Buscar por O.S ou Cliente...">
+            <div id="lista-os"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="osModal">
+        <div class="modal-body">
+            <h3 id="modal-os-num">Gerenciar O.S.</h3>
+            <hr style="border-color:var(--border); margin:10px 0">
+            <label>Técnico Responsável</label>
+            <select id="m-tecnico"></select>
+            <label>Custos do Serviço</label>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
+                <input id="m-v-peca" type="number" placeholder="Custo Peça" oninput="calcTotal()">
+                <input id="m-v-obra" type="number" placeholder="Mão de Obra" oninput="calcTotal()">
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
+                <input id="m-v-frete" type="number" placeholder="Frete/Despesa" oninput="calcTotal()">
+                <input id="m-v-desc" type="number" placeholder="Desconto R$" oninput="calcTotal()">
+            </div>
+            <label>Peça do Estoque</label>
+            <select id="m-peca-estoque"></select>
+            <label>Forma de Pagamento</label>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
+                <select id="m-metodo" onchange="calcTotal()">
+                    <option value="Pix">Pix</option>
+                    <option value="Débito">Cartão de Débito</option>
+                    <option value="Crédito (Vista)">Crédito à Vista</option>
+                    <option value="Crédito (Parc)">Crédito Parcelado</option>
+                    <option value="Dinheiro">Dinheiro</option>
+                </select>
+                <input id="m-v-pago" type="number" placeholder="Valor Recebido">
+            </div>
+            <label>Status Operacional</label>
+            <select id="m-status">
+                <option value="Bancada">👨‍🔧 Na Bancada</option>
+                <option value="Aguardando Peça">📦 Aguardando Peça</option>
+                <option value="Pronto">✅ Pronto / Testado</option>
+                <option value="Entregue">💰 Entregue e Pago</option>
+                <option value="Cancelado">❌ Cancelado</option>
+            </select>
+            <div style="background:#000; padding:15px; border-radius:8px; margin-bottom:15px; text-align:center">
+                <label>Total Final Líquido</label>
+                <h2 id="m-v-total" style="color:var(--success)">R$ 0,00</h2>
+            </div>
+            <button class="btn-main" onclick="salvarAlteracaoOS()">SALVAR ALTERAÇÕES</button>
+            <button class="btn-sec" onclick="visualizarOS(osAtivaId)" style="background:#6366f1; font-weight:700">📄 VISUALIZAR RECIBO</button>
+            <button class="btn-sec" onclick="enviarZapOS()" style="background:#25d366; font-weight: 700;">📲 ENVIAR WHATSAPP</button>
+            <button class="btn-sec" onclick="closeModal()">VOLTAR</button>
+        </div>
+    </div>
+
+    <div class="modal" id="printModal">
+        <div class="modal-body" id="modal-print-body" style="background: white; color: black; max-width: 600px;">
+            <div id="print-content" style="padding: 10px; font-family: monospace; line-height: 1.2;"></div>
+            <button class="btn-main" onclick="window.print()">🖨️ IMPRIMIR / PDF</button>
+            <button class="btn-sec" style="color: #000; border-color: #ccc" onclick="document.getElementById('printModal').style.display='none'">FECHAR</button>
+        </div>
+    </div>
+
+<script>
+    /* LÓGICA DE DADOS CONSERVADA 100% */
+    let clientes = JSON.parse(localStorage.getItem('P_CLI')) || [];
+    let ordens = JSON.parse(localStorage.getItem('P_ORD')) || [];
+    let estoque = JSON.parse(localStorage.getItem('P_EST')) || [];
+    let fornecedores = JSON.parse(localStorage.getItem('P_FOR')) || [];
+    let freteiros = JSON.parse(localStorage.getItem('P_FRE')) || [];
+    let tecnicos = JSON.parse(localStorage.getItem('P_TEC')) || [];
+    let osAtivaId = null;
+    let meuGrafico = null;
+    let fotosAtuais = [];
+    let currentSystemFilter = 'iphone';
+    let currentCategory = null; 
+
+    const itensFunc = ["Touch/Display", "Conector Carga", "Câmera Frontal", "Câmera Traseira", "Microfone", "Auricular", "Alto-falante", "Wi-Fi / BT", "Sinal de Rede", "Botão Power", "Botões Vol", "Sensor Prox.", "Biometria/FaceID", "Flash/Lanterna", "Vibracall", "Gaveta Chip"];
+    const itensExt = ["Vidro Frontal", "Tampa Traseira", "Aro/Lateral", "Lente Câmera", "Parafusos"];
+    let checkResult = {};
+
+    /* BANCO DE DADOS ULTRA EXPANDIDO PRESERVADO */
+    const bancoFalhas = {
+        iphone: {
+            energia: [
+                { t: "Consumo 60-90mA Travado", s: "Falha CPU/NAND ou trilha rompida sob o PMIC. Verifique malhas I2C." },
+                { t: "Erro 4013 iTunes", s: "Falha NAND ou sensor de proximidade em curto (Flex Superior)." },
+                { t: "Reiniciando a cada 3 min", s: "Sensor térmico ausente. Verifique Flex de Carga ou Bateria original." },
+                { t: "Curto VDD_MAIN", s: "Injete 3.8V para detectar componente aquecendo. Geralmente capacitor em curto." },
+                { t: "Não carrega (Hydra/Tristar)", s: "Falha no CI de carga. Teste com medidor USB." },
+                { t: "Fuga de corrente desligado (0.02A)", s: "Possível fuga no CI de áudio ou capacitores da malha PP_BATT_VCC." },
+                { t: "Erro 9 / Erro 4005", s: "Falha de comunicação com a memória NAND. Verificar resistores de 1.8V." },
+                { t: "Morto após carga veicular", s: "Curto no CI Hydra/U2. Troca do CI obrigatória." },
+                { t: "Consumo 0.15A e zera", s: "Falha de inicialização de CPU. Verificar cristal oscilador." },
+                { t: "Esquenta muito no PMIC", s: "Curto em malha secundária (LDO). Verifique capacitores em volta do CI." },
+                { t: "Só liga no cabo", s: "Falha no CI de Power ou trilha SWI da bateria rompida." },
+                { t: "Carrega falso (mostra raio mas não sobe %)", s: "Bobina de carga aberta ou CI Tigris com defeito." }
+            ],
+            tela: [
+                { t: "Sem Imagem (Backlight)", s: "Diodo ou bobina L-Boost. Verifique capacitores do filtro de saída." },
+                { t: "Touch Parou (X/XS/11)", s: "Interposer (união das placas) rompida. Requer Reballing." },
+                { t: "True Tone Sumiu", s: "Necessário copiar dados da tela antiga (Programadora JC)." },
+                { t: "Linha na tela após queda", s: "Dano no flex do display ou no cristal. Troca da peça." },
+                { t: "Touch fantasma", s: "Blindagem encostando no flex ou tela de má qualidade." },
+                { t: "Flicker (Tela piscando)", s: "Falha na alimentação de 5.7V (Chestnut)." },
+                { t: "Touch ID falha (Botão não clica)", s: "U10 (Turtle) no flex do botão home quebrado ou sem alimentação." }
+            ],
+            audio: [
+                { t: "Loop de Áudio (iPhone 7)", s: "Falha Codec U3101. Reballing e jumper no pino C12." },
+                { t: "Sem Som em Ligações", s: "Amplificador de áudio ou Codec com oxidação." },
+                { t: "Microfone traseiro falhando", s: "Flex do Power/Flash com defeito. Trocar o flex completo." },
+                { t: "Auricular baixo", s: "Sujeira física na malha ou falha no amplificador secundário." },
+                { t: "Viva-voz desabilitado", s: "Falha de comunicação I2S entre CPU e Codec de Áudio." }
+            ],
+            rede: [
+                { t: "Sem Serviço (Triângulo)", s: "Falha Baseband. Verifique Firmware do Modem nos ajustes." },
+                { t: "Wi-Fi Cinza (Desabilitado)", s: "CI de Wi-Fi com solda fria ou sem alimentação de 1.8V." },
+                { t: "Sinal Fraco", s: "Antena coaxial mal conectada ou filtro de antena rompido." },
+                { t: "Bluetooth não ativa", s: "Compartilhado com o CI de Wifi. Reballing do módulo." },
+                { t: "Erro ao buscar redes", s: "Transceiver (WTR) com falha de alimentação." }
+            ],
+            camera: [
+                { t: "Câmera Traseira preta", s: "Verifique tensões de 2.8V e 1.1V no conector FPC." },
+                { t: "Foco vibrando", s: "Estabilizador óptico (OIS) quebrado. Apenas troca do módulo." },
+                { t: "Flash não funciona", s: "Geralmente associado a falha na câmera principal ou flex power." }
+            ],
+            sensores: [
+                { t: "FaceID Mova p/ cima/baixo", s: "Prisma do Dot Projector desalinhado ou CI desvinculado por umidade." },
+                { t: "Touch ID indisponível", s: "Flex cortado ou falta de 16.5V 'Mamba' na placa." },
+                { t: "Giroscópio falha", s: "CI do acelerômetro danificado por queda." }
+            ]
+        },
+        android: {
+            energia: [
+                { t: "Consumo 120-150mA fixo", s: "Falha CPU/Memória. Tente Reballing ou Stock ROM." },
+                { t: "Sinal interrogação bateria", s: "Termistor (NTC) aberto. Verifique sub-placa." },
+                { t: "Só carrega desligado", s: "CI OVP aberto ou trilhas USB_ID/D+/D- rompidas." },
+                { t: "Bootloop no Logo", s: "Botão Power 'preso' ou memória EMMC desgastada." },
+                { t: "Drenagem rápida", s: "Fuga no PA de sinal ou capacitores próximos ao IF-PMIC." },
+                { t: "Pulo de carga (de 20% para 0%)", s: "Célula de bateria estufada ou química cansada." },
+                { t: "Sensor de umidade no conector", s: "Oxidação nos pinos USB. Limpeza ou troca da sub-placa." },
+                { t: "Não liga, vibra 3 vezes", s: "Código de erro de memória. Reballing CPU/RAM." }
+            ],
+            tela: [
+                { t: "Tela verde/piscando (Amoled)", s: "Dano interno no painel. Apenas substituição." },
+                { t: "Touch falha ao carregar", s: "Ruído de carregador paralelo. Use original." },
+                { t: "Sem imagem, mas vibra", s: "Filtros EMI (bobinas pretas) com solda fria." },
+                { t: "Mancha roxa crescendo", s: "Vazamento de cristal líquido. Troca da frontal." }
+            ],
+            audio: [
+                { t: "Som Baixo Auricular", s: "Limpeza física ou malha de proteção entupida." },
+                { t: "Fone detectado sem estar plugado", s: "Curto no Jack P2 ou no CI chaveador." },
+                { t: "Microfone chiando", s: "Entrada obstruída ou falha no conversor analógico/digital." }
+            ],
+            rede: [
+                { t: "Apenas Emergência", s: "IMEI Impedido ou antena coaxial desconectada." },
+                { t: "Wi-Fi não ativa", s: "Módulo WCN com solda fria. Recomenda-se Reflow 350°C." },
+                { t: "Sinal oscilando", s: "Falta de contato nos pads da carcaça." }
+            ],
+            camera: [
+                { t: "Erro de Servidor Câmera", s: "Limpar dados do app ou falha na tensão LDO 2.8V." },
+                { t: "Câmera desfocada", s: "Lente suja internamente ou motor AF travado." }
+            ],
+            sensores: [
+                { t: "Biometria indisponível", s: "Flex desconectado ou falha de firmware. Teste menu *#0*#." },
+                { t: "Tela apaga ao ouvir áudio", s: "Sensor de proximidade sujo ou película desalinhada." }
+            ]
+        }
+    };
+
+    function filtrarDefeitos() { if(!currentCategory) return; mostrarFalhas(currentCategory); }
+
+    function setSytemFilter(sys) {
+        currentSystemFilter = sys;
+        document.getElementById('btn-filtro-iphone').style.background = sys === 'iphone' ? '#333' : '#18181b';
+        document.getElementById('btn-filtro-android').style.background = sys === 'android' ? '#3d5afe' : '#18181b';
+        document.getElementById('result-solucao').innerHTML = ""; 
+        notify(`Modo ${sys.toUpperCase()} ativado`);
+    }
+
+    function mostrarFalhas(cat) {
+        currentCategory = cat; 
+        const termo = document.getElementById('busca-defeito').value.toLowerCase();
+        const res = document.getElementById('result-solucao');
+        const falhas = bancoFalhas[currentSystemFilter][cat];
+        res.innerHTML = `<h4>Defeitos ${currentSystemFilter.toUpperCase()}: ${cat.toUpperCase()}</h4>`;
+        const filtradas = falhas.filter(f => f.t.toLowerCase().includes(termo) || f.s.toLowerCase().includes(termo));
+        if(filtradas.length === 0) {
+            res.innerHTML += `<p style="font-size:12px; color:var(--muted)">Nenhum resultado encontrado.</p>`;
+            return;
+        }
+        filtradas.forEach(f => {
+            res.innerHTML += `<div class="solucao-card" style="border-left-color: ${currentSystemFilter==='iphone'?'#fff':'#3d5afe'}">
+                <b style="color:var(--primary)">PROBLEMA: ${f.t}</b><br><small>🔍 SOLUÇÃO: ${f.s}</small></div>`;
+        });
+    }
+
+    function analisarPanic() {
+        const log = document.getElementById('panic-log').value;
+        const res = document.getElementById('panic-result');
+        let diag = "⚠️ Log não reconhecido.";
+        if(log.includes("Prs0")) diag = "🔍 DIAGNÓSTICO: Falha no Sensor de Pressão (Barômetro). Geralmente Dock de Carga.";
+        if(log.includes("Mic2")) diag = "🔍 DIAGNÓSTICO: Falha no Microfone Superior. Verifique Flex do Power/Flash.";
+        if(log.includes("Thermal")) diag = "🔍 DIAGNÓSTICO: Superaquecimento detectado. Verifique CI de Carga.";
+        if(log.includes("Watchdog")) diag = "🔍 DIAGNÓSTICO: Reinicialização por bateria ou Dock de Carga paralelo.";
+        res.style.display = "block"; res.innerHTML = diag;
+    }
+
+    function efetuarLogin() {
+        const u = document.getElementById('login-user').value;
+        const p = document.getElementById('login-pass').value;
+        if(u === "admin" && p === "123") {
+            document.getElementById('login-screen').style.opacity = '0';
+            setTimeout(() => { document.getElementById('login-screen').style.display = 'none'; }, 300);
+            notify("Acesso concedido!");
+        } else { notify("Usuário ou senha inválidos", "error"); }
+    }
+
+    function toggleDarkMode() {
+        document.body.classList.toggle('light-mode');
+        const isLight = document.body.classList.contains('light-mode');
+        document.getElementById('toggle-dark').innerText = isLight ? "🌙 ALTERAR PARA MODO ESCURO" : "☀️ ALTERAR PARA MODO CLARO";
+    }
+
+    function notify(text, type = 'success') {
+        const container = document.getElementById('notif-container');
+        const n = document.createElement('div');
+        n.className = 'notif';
+        if(type === 'error') n.style.borderLeftColor = 'var(--error)';
+        n.innerText = text;
+        container.appendChild(n);
+        setTimeout(() => { n.style.opacity = '0'; setTimeout(() => n.remove(), 300); }, 3000);
+        checkAlerts();
+    }
+
+    function toggleMenu() { document.getElementById('mainMenu').classList.toggle('active'); }
+    function toggleNotifCenter() { document.getElementById('notifCenter').classList.toggle('active'); }
+    
+    function nav(p) {
+        document.querySelectorAll('.page').forEach(pg => pg.classList.remove('active'));
+        document.getElementById('pg-'+p).classList.add('active');
+        document.getElementById('mainMenu').classList.remove('active');
+        if(p === 'dash') renderDash();
+        if(p === 'entrada') { renderChecklists(); fotosAtuais = []; renderPreviews(); }
+        if(p === 'lista') renderOS();
+        if(p === 'clientes') renderClientes();
+        if(p === 'fornecedores') renderFornecedores();
+        if(p === 'freteiros') renderFreteiros();
+        if(p === 'estoque') renderEstoque();
+        if(p === 'tecnicos') renderTecnicos();
+    }
+
+    function salvarTecnico() {
+        const nome = document.getElementById('t-nome').value;
+        if(!nome) return notify("Nome do técnico obrigatório", "error");
+        tecnicos.push({ id: Date.now(), nome });
+        localStorage.setItem('P_TEC', JSON.stringify(tecnicos));
+        document.getElementById('t-nome').value = "";
+        renderTecnicos(); notify("Técnico cadastrado!");
+    }
+
+    function renderTecnicos() {
+        const l = document.getElementById('lista-tecnicos'); l.innerHTML = "";
+        tecnicos.forEach(t => l.innerHTML += `<div class="card"><button class="btn-del" onclick="excluir('TEC', ${t.id})">APAGAR</button><b>${t.nome}</b></div>`);
+    }
+
+    function gerarRelatorio() {
+        const inicio = document.getElementById('rel-inicio').value;
+        const fim = document.getElementById('rel-fim').value;
+        const status = document.getElementById('rel-status').value;
+        let filtrados = ordens.filter(o => {
+            let dataOk = true;
+            if(inicio && fim) {
+                const partes = o.data.split('/');
+                const dataOS = new Date(partes[2], partes[1] - 1, partes[0]);
+                dataOk = dataOS >= new Date(inicio) && dataOS <= new Date(fim);
+            }
+            let statusOk = status === "Todos" || o.status.includes(status);
+            return dataOk && statusOk;
+        });
+        let bruto = filtrados.reduce((a, b) => a + (b.vTotal || 0), 0);
+        let pecas = filtrados.reduce((a, b) => a + (b.vPeca || 0), 0);
+        let frete = filtrados.reduce((a, b) => a + (b.vFrete || 0), 0);
+        let lucro = bruto - pecas - frete;
+        document.getElementById('r-bruto').innerText = "R$ " + bruto.toFixed(2);
+        document.getElementById('r-pecas').innerText = "R$ " + pecas.toFixed(2);
+        document.getElementById('r-frete').innerText = "R$ " + frete.toFixed(2);
+        document.getElementById('r-lucro').innerText = "R$ " + lucro.toFixed(2);
+        let html = `<table style="width:100%"><tr style="border-bottom:1px solid var(--border)"><th>O.S.</th><th>Cliente</th><th>Total</th></tr>`;
+        filtrados.forEach(o => html += `<tr><td>#${o.num}</td><td>${o.cNome}</td><td style="text-align:right">R$ ${o.vTotal.toFixed(2)}</td></tr>`);
+        html += `</table>`;
+        document.getElementById('rel-tabela').innerHTML = html;
+        document.getElementById('resumo-financeiro').style.display = 'block';
+    }
+
+    function imprimirRelatorio() {
+        const resumo = document.getElementById('resumo-financeiro').innerHTML;
+        const html = `<div style="color:black"><h2>RELATÓRIO - PINHEIRO TECH</h2>${resumo}</div>`;
+        document.getElementById('print-content').innerHTML = html;
+        document.getElementById('printModal').style.display = 'flex';
+        setTimeout(() => window.print(), 500);
+    }
+
+    function renderChecklists() {
+        const sel = document.getElementById('sel-cliente'); sel.innerHTML = '<option value="">Selecione o Cliente...</option>';
+        clientes.forEach(c => sel.innerHTML += `<option value="${c.id}">${c.nome}</option>`);
+        document.getElementById('chk-func').innerHTML = itensFunc.map(i => criarLinha(i)).join("");
+        document.getElementById('chk-ext').innerHTML = itensExt.map(i => criarLinha(i)).join("");
+    }
+
+    function criarLinha(i) {
+        checkResult[i] = "N/A";
+        return `<div class="chk-row"><span>${i}</span><div class="opt-group">
+            <button class="opt-btn" id="ok-${i}" onclick="setSt('${i}','OK')">OK</button>
+            <button class="opt-btn" id="bad-${i}" onclick="setSt('${i}','DEF')">DEF</button>
+            <button class="opt-btn active-na" id="na-${i}" onclick="setSt('${i}','NA')">N/A</button>
+        </div></div>`;
+    }
+
+    function setSt(i, st) {
+        checkResult[i] = st;
+        document.querySelectorAll(`[id$="-${i}"]`).forEach(b => b.classList.remove('active-ok', 'active-bad', 'active-na'));
+        if(st === 'OK') document.getElementById(`ok-${i}`).classList.add('active-ok');
+        if(st === 'DEF') document.getElementById(`bad-${i}`).classList.add('active-bad');
+        if(st === 'NA') document.getElementById(`na-${i}`).classList.add('active-na');
+    }
+
+    function salvarEstoque() {
+        const idAtual = document.getElementById('e-id-atual').value;
+        const dados = { id: idAtual ? parseInt(idAtual) : Date.now(), nome: document.getElementById('e-nome').value, forn: document.getElementById('sel-forn-est').value, status: document.getElementById('e-status').value, freteiro: document.getElementById('sel-freteiro-est').value, qtd: Number(document.getElementById('e-qtd').value) };
+        if(idAtual) { const index = estoque.findIndex(e => e.id == idAtual); estoque[index] = dados; }
+        else { estoque.push(dados); }
+        localStorage.setItem('P_EST', JSON.stringify(estoque)); limparFormEstoque(); renderEstoque(); notify("Estoque atualizado!");
+    }
+
+    function editarPeca(id) {
+        const peca = estoque.find(e => e.id == id);
+        document.getElementById('e-id-atual').value = peca.id;
+        document.getElementById('e-nome').value = peca.nome;
+        document.getElementById('e-status').value = peca.status;
+        document.getElementById('e-qtd').value = peca.qtd;
+        window.scrollTo(0,0);
+    }
+
+    function limparFormEstoque() { document.getElementById('e-id-atual').value = ""; document.getElementById('e-nome').value = ""; document.getElementById('e-qtd').value = ""; }
+
+    function renderEstoque() {
+        const sf = document.getElementById('sel-forn-est'); sf.innerHTML = '<option value="">Fornecedor...</option>';
+        fornecedores.forEach(f => sf.innerHTML += `<option value="${f.nome}">${f.nome}</option>`);
+        const sfr = document.getElementById('sel-freteiro-est'); sfr.innerHTML = '<option value="">Sem freteiro</option>';
+        freteiros.forEach(f => sfr.innerHTML += `<option value="${f.nome}">${f.nome}</option>`);
+        const l = document.getElementById('lista-estoque'); l.innerHTML = "";
+        estoque.slice().reverse().forEach(e => {
+            let corStatus = e.status === "Em Estoque" ? "var(--success)" : e.status === "Pendente" ? "var(--error)" : "var(--warning)";
+            l.innerHTML += `<div class="card" style="border-left: 5px solid ${corStatus}"><button class="btn-del" onclick="excluir('EST', ${e.id})">APAGAR</button><div onclick="editarPeca(${e.id})"><b>${e.nome}</b><br><small>Qtd: ${e.qtd} | Status: ${e.status}</small></div></div>`;
+        });
+    }
+
+    function salvarCliente() {
+        clientes.push({ id: Date.now(), nome: document.getElementById('c-nome').value, zap: document.getElementById('c-zap').value, zap2: document.getElementById('c-zap2').value, doc: document.getElementById('c-doc').value, end: document.getElementById('c-end').value, cidade: document.getElementById('c-cidade').value });
+        localStorage.setItem('P_CLI', JSON.stringify(clientes)); nav('clientes');
+    }
+    function renderClientes() {
+        const l = document.getElementById('lista-clientes'); l.innerHTML = "";
+        clientes.slice().reverse().forEach(c => l.innerHTML += `<div class="card"><button class="btn-del" onclick="excluir('CLI', ${c.id})">APAGAR</button><b>${c.nome}</b><br><small>${c.zap}</small></div>`);
+    }
+
+    function salvarFornecedor() {
+        fornecedores.push({ id: Date.now(), nome: document.getElementById('f-nome').value, tel: document.getElementById('f-tel').value });
+        localStorage.setItem('P_FOR', JSON.stringify(fornecedores)); renderFornecedores();
+    }
+    function renderFornecedores() {
+        const l = document.getElementById('lista-fornecedores'); l.innerHTML = "";
+        fornecedores.forEach(f => l.innerHTML += `<div class="card"><button class="btn-del" onclick="excluir('FOR', ${f.id})">APAGAR</button><b>${f.nome}</b></div>`);
+    }
+
+    function salvarFreteiro() {
+        freteiros.push({ id: Date.now(), nome: document.getElementById('fr-nome').value, tel: document.getElementById('fr-tel').value });
+        localStorage.setItem('P_FRE', JSON.stringify(freteiros)); renderFreteiros();
+    }
+    function renderFreteiros() {
+        const l = document.getElementById('lista-freteiros'); l.innerHTML = "";
+        freteiros.forEach(f => l.innerHTML += `<div class="card"><button class="btn-del" onclick="excluir('FRE', ${f.id})">APAGAR</button><b>${f.nome}</b></div>`);
+    }
+
+    function excluir(tipo, id) {
+        if(!confirm("Apagar registro permanentemente?")) return;
+        if(tipo === 'ORD') ordens = ordens.filter(x => x.id !== id);
+        if(tipo === 'CLI') clientes = clientes.filter(x => x.id !== id);
+        if(tipo === 'EST') estoque = estoque.filter(x => x.id !== id);
+        if(tipo === 'TEC') tecnicos = tecnicos.filter(x => x.id !== id);
+        if(tipo === 'FOR') fornecedores = fornecedores.filter(x => x.id !== id);
+        if(tipo === 'FRE') freteiros = freteiros.filter(x => x.id !== id);
+        
+        localStorage.setItem('P_ORD', JSON.stringify(ordens));
+        localStorage.setItem('P_CLI', JSON.stringify(clientes));
+        localStorage.setItem('P_EST', JSON.stringify(estoque));
+        localStorage.setItem('P_TEC', JSON.stringify(tecnicos));
+        localStorage.setItem('P_FOR', JSON.stringify(fornecedores));
+        localStorage.setItem('P_FRE', JSON.stringify(freteiros));
+
+        if(tipo === 'ORD') renderOS();
+        if(tipo === 'CLI') renderClientes();
+        if(tipo === 'EST') renderEstoque();
+        if(tipo === 'TEC') renderTecnicos();
+        if(tipo === 'FOR') renderFornecedores();
+        if(tipo === 'FRE') renderFreteiros();
+        notify("Registro excluído!");
+    }
+
+    function gerarOS() {
+        const cId = document.getElementById('sel-cliente').value;
+        const c = clientes.find(x => x.id == cId);
+        const osNum = ordens.length > 0 ? ordens[ordens.length - 1].num + 1 : 1001;
+        ordens.push({ id: Date.now(), num: osNum, cNome: c.nome, cZap: c.zap, apa: document.getElementById('os-apa').value, status: 'Bancada', vPeca: 0, vObra: 0, vTotal: 0, vFrete: 0, vDesc: 0, data: new Date().toLocaleDateString('pt-BR'), fotos: [...fotosAtuais], tecnico: "Não definido", peca: "Não definida", check: {...checkResult}, serv: document.getElementById('os-serv').value, senha: document.getElementById('os-senha').value });
+        localStorage.setItem('P_ORD', JSON.stringify(ordens)); nav('lista');
+    }
+
+    function renderOS() {
+        const l = document.getElementById('lista-os'); l.innerHTML = "";
+        const b = document.getElementById('busca').value.toLowerCase();
+        ordens.slice().reverse().forEach(o => {
+            if(o.cNome.toLowerCase().includes(b) || o.num.toString().includes(b)) {
+                let statusClass = o.status === 'Bancada' ? 'status-bancada' : o.status === 'Aguardando Peça' ? 'status-peca' : o.status === 'Pronto' ? 'status-pronto' : o.status === 'Entregue' ? 'status-entregue' : 'status-cancelado';
+                let bgClass = o.status === 'Bancada' ? 'bg-bancada' : o.status === 'Aguardando Peça' ? 'bg-peca' : o.status === 'Pronto' ? 'bg-pronto' : o.status === 'Entregue' ? 'bg-entregue' : 'bg-cancelado';
+                l.innerHTML += `<div class="card ${statusClass}"><button class="btn-del" onclick="excluir('ORD', ${o.id})">APAGAR</button><b>#${o.num} - ${o.cNome}</b><br><span class="badge ${bgClass}">${o.status}</span><br><button class="btn-sec" onclick="openModal(${o.id})" style="margin-top:10px">GERENCIAR</button></div>`;
+            }
+        });
+    }
+
+    function openModal(id) {
+        osAtivaId = id; const o = ordens.find(x => x.id == id);
+        
+        const selT = document.getElementById('m-tecnico');
+        selT.innerHTML = '<option value="Não definido">Selecionar Técnico...</option>';
+        tecnicos.forEach(t => selT.innerHTML += `<option value="${t.nome}">${t.nome}</option>`);
+        selT.value = o.tecnico || "Não definido";
+
+        const selP = document.getElementById('m-peca-estoque');
+        selP.innerHTML = '<option value="Não definida">Nenhuma peça do estoque</option>';
+        estoque.forEach(e => selP.innerHTML += `<option value="${e.nome}">${e.nome} (Qtd: ${e.qtd})</option>`);
+        selP.value = o.peca || "Não definida";
+
+        document.getElementById('m-v-peca').value = o.vPeca || 0;
+        document.getElementById('m-v-obra').value = o.vObra || 0;
+        document.getElementById('m-v-frete').value = o.vFrete || 0;
+        document.getElementById('m-v-desc').value = o.vDesc || 0;
+        document.getElementById('m-status').value = o.status;
+        document.getElementById('osModal').style.display = 'flex';
+        calcTotal();
+    }
+
+    function calcTotal() {
+        const p = Number(document.getElementById('m-v-peca').value) || 0;
+        const o = Number(document.getElementById('m-v-obra').value) || 0;
+        const f = Number(document.getElementById('m-v-frete').value) || 0;
+        const d = Number(document.getElementById('m-v-desc').value) || 0;
+        let sub = (p + o + f) - d;
+        document.getElementById('m-v-total').innerText = "R$ " + sub.toFixed(2);
+        return sub;
+    }
+
+    function salvarAlteracaoOS() {
+        const i = ordens.findIndex(x => x.id == osAtivaId);
+        ordens[i].vPeca = Number(document.getElementById('m-v-peca').value);
+        ordens[i].vObra = Number(document.getElementById('m-v-obra').value);
+        ordens[i].vFrete = Number(document.getElementById('m-v-frete').value);
+        ordens[i].vDesc = Number(document.getElementById('m-v-desc').value);
+        ordens[i].tecnico = document.getElementById('m-tecnico').value;
+        ordens[i].peca = document.getElementById('m-peca-estoque').value;
+        ordens[i].vTotal = calcTotal();
+        ordens[i].status = document.getElementById('m-status').value;
+        localStorage.setItem('P_ORD', JSON.stringify(ordens));
+        closeModal(); renderOS(); notify("O.S. atualizada!");
+    }
+
+    function visualizarOS(id) {
+        const o = ordens.find(x => x.id == id);
+        let checkHTML = "";
+        for(let k in o.check) { checkHTML += `[${o.check[k]}] ${k} | `; }
+
+        document.getElementById('print-content').innerHTML = `
+            <div style="text-align:center; border-bottom:2px solid #000; padding-bottom:10px">
+                <h2 style="margin:0">PINHEIRO TECH - ASSISTÊNCIA TÉCNICA</h2>
+                <p style="font-size:10px">Reparos Avançados em Smartphones e Tablets</p>
+            </div>
+            <div style="padding:15px 0; font-size:12px">
+                <b>ORDEM DE SERVIÇO: #${o.num}</b><br>
+                <b>DATA:</b> ${o.data} | <b>STATUS:</b> ${o.status.toUpperCase()}<br>
+                <b>CLIENTE:</b> ${o.cNome} | <b>ZAP:</b> ${o.cZap}<br>
+                <hr style="margin:10px 0; border:0; border-top:1px dashed #000">
+                <b>APARELHO:</b> ${o.apa} | <b>SENHA:</b> ${o.senha || 'Não informada'}<br>
+                <b>TÉCNICO:</b> ${o.tecnico}<br>
+                <b>PROBLEMA:</b> ${o.serv}<br>
+                <hr style="margin:10px 0; border:0; border-top:1px dashed #000">
+                <b>CHECKLIST:</b><br><span style="font-size:9px">${checkHTML}</span>
+                <hr style="margin:10px 0; border:0; border-top:1px dashed #000">
+                <div style="text-align:right">
+                    <b>PEÇAS:</b> R$ ${o.vPeca.toFixed(2)}<br>
+                    <b>MÃO DE OBRA:</b> R$ ${o.vObra.toFixed(2)}<br>
+                    <b>FRETE/DESPESAS:</b> R$ ${o.vFrete.toFixed(2)}<br>
+                    <b style="color:red">DESCONTOS:</b> R$ ${o.vDesc.toFixed(2)}<br>
+                    <h3 style="margin-top:5px">TOTAL: R$ ${o.vTotal.toFixed(2)}</h3>
+                </div>
+            </div>
+            <div style="margin-top:30px; text-align:center; font-size:10px">
+                <p>___________________________________________________</p>
+                <p>Assinatura do Cliente</p>
+                <p style="margin-top:10px; font-style:italic">Garantia de 90 dias conforme CDC apenas para o serviço executado.</p>
+            </div>
+        `;
+        document.getElementById('printModal').style.display = 'flex';
+    }
+
+    function enviarZapOS() {
+        const o = ordens.find(x => x.id == osAtivaId);
+        const msg = `Olá ${o.cNome}, aqui é da *Pinheiro Tech*! 🛠️\n\nInformamos que o seu *${o.apa}* (O.S. #${o.num}) foi atualizado para o status: *${o.status.toUpperCase()}*.\n\n*Resumo do Orçamento:*\nMão de Obra: R$ ${o.vObra.toFixed(2)}\nPeças: R$ ${o.vPeca.toFixed(2)}\n*Valor Total: R$ ${o.vTotal.toFixed(2)}*\n\nQualquer dúvida, estamos à disposição!`;
+        window.open(`https://wa.me/55${o.cZap}?text=${encodeURIComponent(msg)}`);
+    }
+
+    function renderDash() {
+        const fat = ordens.filter(o => o.status === 'Entregue').reduce((a, b) => a + (b.vTotal || 0), 0);
+        document.getElementById('d-caixa').innerText = "R$ " + fat.toFixed(2);
+        
+        const abertas = ordens.filter(o => o.status === 'Bancada' || o.status === 'Aguardando Peça').length;
+        const pecas = ordens.filter(o => o.status === 'Aguardando Peça').length;
+        const prontas = ordens.filter(o => o.status === 'Pronto').length;
+        
+        document.getElementById('d-ativos').innerText = abertas;
+        document.getElementById('d-peca').innerText = pecas;
+        document.getElementById('d-pronto').innerText = prontas;
+
+        const ctx = document.getElementById('meuGrafico').getContext('2d');
+        if(meuGrafico) meuGrafico.destroy();
+        meuGrafico = new Chart(ctx, { type: 'bar', data: { labels: ['Faturamento'], datasets: [{ data: [fat], backgroundColor: ['#3b82f6'] }] } });
+        checkAlerts();
+    }
+
+    function checkAlerts() {
+        const list = document.getElementById('notif-list');
+        const badge = document.getElementById('notif-badge');
+        let alerts = [];
+        estoque.forEach(e => { if(e.qtd <= 2) alerts.push(`<div class="notif-item notif-warn"><span class="notif-title">⚠️ ESTOQUE BAIXO</span>${e.nome} (Qtd: ${e.qtd})</div>`); });
+        
+        badge.innerText = alerts.length;
+        badge.style.display = alerts.length > 0 ? 'block' : 'none';
+        list.innerHTML = alerts.length > 0 ? alerts.join("") : '<p style="padding:15px; font-size:12px; color:var(--muted)">Nenhum alerta crítico no momento.</p>';
+    }
+
+    function addFoto(input) {
+        const reader = new FileReader();
+        reader.onload = (e) => { fotosAtuais.push(e.target.result); renderPreviews(); };
+        reader.readAsDataURL(input.files[0]);
+    }
+
+    function renderPreviews() {
+        const boxes = document.querySelectorAll('#photo-preview-container .photo-box');
+        boxes.forEach((box, i) => { box.innerHTML = fotosAtuais[i] ? `<img src="${fotosAtuais[i]}">` : i + 1; });
+        document.getElementById('btn-foto-count').innerText = `📷 TIRAR FOTO (${fotosAtuais.length}/6)`;
+    }
+
+    function closeModal() { document.getElementById('osModal').style.display = 'none'; }
+    window.onload = renderDash;
+</script>
+</body>
+</html>
